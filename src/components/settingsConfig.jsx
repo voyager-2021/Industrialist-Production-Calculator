@@ -23,6 +23,17 @@ import {
 import { getProductName } from '../utils/variableHandler';
 import { getProduct, products } from '../data/dataLoader';
 
+// Helper to match a product by name or ID
+const findProduct = (searchText) => {
+  if (!searchText) return null;
+  const lower = searchText.toLowerCase();
+  return products.find(p =>
+    p.id.toLowerCase() === lower ||
+    p.name.toLowerCase() === lower ||
+    p.name.toLowerCase().includes(lower)
+  );
+};
+
 // Helper to format power
 const formatPower = (power) => {
   if (!power) return 'N/A';
@@ -48,6 +59,8 @@ export const getSettingsConfig = (recipeType, recipe, globalPollution) => {
       return getBoilerConfig();
     case 'chemicalPlant':
       return getChemicalPlantConfig();
+    case 'custom':
+      return getCustomConfig();
     default:
       return null;
   }
@@ -491,6 +504,175 @@ const getChemicalPlantConfig = () => ({
   ),
   onApply: (settings) => {
     return { settings, inputs: [], outputs: [], metrics: null };
+  }
+});
+
+// Custom Recipe configuration
+const getCustomConfig = () => ({
+  title: 'Custom Recipe Settings',
+  defaultSettings: {
+    recipeName: 'Custom Recipe',
+    machineName: 'Custom Machine',
+    cycleTime: 5,
+    powerConsumption: 0,
+    powerType: 'MV',
+    pollution: 0,
+    cost: 0,
+    inputs: [{ product: '', quantity: 1 }],
+    outputs: [{ product: '', quantity: 1 }]
+  },
+  fields: [
+    {
+      type: 'text-input',
+      key: 'recipeName',
+      label: 'Recipe Name:',
+      placeholder: 'e.g. Makes Widget'
+    },
+    {
+      type: 'text-input',
+      key: 'machineName',
+      label: 'Machine Name:',
+      placeholder: 'e.g. Widget Assembler'
+    },
+    {
+      type: 'number',
+      key: 'cycleTime',
+      label: 'Cycle Time (s):',
+      min: 0.01,
+      step: 0.1,
+      placeholder: '5',
+      hasError: (val) => val <= 0
+    },
+    {
+      type: 'number',
+      key: 'powerConsumption',
+      label: 'Power (MF/s, negative = generation):',
+      step: 1,
+      placeholder: '0'
+    },
+    {
+      type: 'select',
+      key: 'powerType',
+      label: 'Power Type:',
+      options: [
+        { value: 'MV', label: 'MV' },
+        { value: 'HV', label: 'HV' }
+      ]
+    },
+    {
+      type: 'number',
+      key: 'pollution',
+      label: 'Pollution (%/hr, negative = absorption):',
+      step: 0.1,
+      placeholder: '0'
+    },
+    {
+      type: 'number',
+      key: 'cost',
+      label: 'Machine Cost ($):',
+      min: 0,
+      step: 1,
+      placeholder: '0'
+    },
+    {
+      type: 'dynamic-list',
+      key: 'inputs',
+      label: 'Inputs',
+      subFields: [
+        {
+          type: 'product-input',
+          key: 'product',
+          label: 'Product',
+          placeholder: 'Search product name...'
+        },
+        {
+          type: 'number',
+          key: 'quantity',
+          label: 'Qty',
+          min: 0.01,
+          step: 1,
+          placeholder: '1',
+          hasError: (val) => val <= 0
+        }
+      ],
+      defaultItem: { product: '', quantity: 1 }
+    },
+    {
+      type: 'dynamic-list',
+      key: 'outputs',
+      label: 'Outputs',
+      subFields: [
+        {
+          type: 'product-input',
+          key: 'product',
+          label: 'Product',
+          placeholder: 'Search product name...'
+        },
+        {
+          type: 'number',
+          key: 'quantity',
+          label: 'Qty',
+          min: 0.01,
+          step: 1,
+          placeholder: '1',
+          hasError: (val) => val <= 0
+        }
+      ],
+      defaultItem: { product: '', quantity: 1 }
+    }
+  ],
+  hasErrors: (settings) => {
+    if (settings.cycleTime <= 0) return true;
+    for (const item of settings.inputs) {
+      if (item.quantity <= 0) return true;
+    }
+    for (const item of settings.outputs) {
+      if (item.quantity <= 0) return true;
+    }
+    return false;
+  },
+  onApply: (settings) => {
+    const resolveProductId = (productText) => {
+      if (!productText) return 'p_any_item';
+      const product = findProduct(productText);
+      return product ? product.id : productText;
+    };
+    const resolveProductName = (productText) => {
+      if (!productText) return 'Variable Item';
+      const product = findProduct(productText);
+      return product ? product.name : productText;
+    };
+
+    const inputs = settings.inputs
+      .filter(item => item.product && item.quantity > 0)
+      .map(item => ({
+        product_id: resolveProductId(item.product),
+        quantity: item.quantity,
+        q_mode: 'none'
+      }));
+
+    const outputs = settings.outputs
+      .filter(item => item.product && item.quantity > 0)
+      .map(item => ({
+        product_id: resolveProductId(item.product),
+        quantity: item.quantity,
+        q_mode: 'none'
+      }));
+
+    return {
+      settings,
+      inputs,
+      outputs,
+      metrics: {
+        recipeName: settings.recipeName || 'Custom Recipe',
+        machineName: settings.machineName || 'Custom Machine',
+        cycleTime: settings.cycleTime || 5,
+        powerConsumption: settings.powerConsumption || 0,
+        powerType: settings.powerType || 'MV',
+        pollution: settings.pollution || 0,
+        cost: settings.cost || 0
+      }
+    };
   }
 });
 

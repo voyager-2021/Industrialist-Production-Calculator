@@ -273,6 +273,7 @@ function App() {
     onBoilerSettingsChange: handleBoilerSettingsChange,
     onChemicalPlantSettingsChange: handleChemicalPlantSettingsChange,
     onWasteFacilitySettingsChange: handleWasteFacilitySettingsChange,
+    onCustomRecipeChange: handleCustomRecipeChange,
 
     onMiddleClick: onNodeMiddleClick,
     onHandleDoubleClick: handleHandleDoubleClick,
@@ -1352,6 +1353,37 @@ function App() {
     triggerRecalculation('settings');
   }, [cleanupInvalidConnections, triggerRecalculation, setNodes]);
 
+  const handleCustomRecipeChange = useCallback((nodeId, settings, inputs, outputs, metrics) => {
+    setNodes(nds => nds.map(n => {
+      if (n.id !== nodeId) return n;
+      const baseMachine = getMachine('m_custom') || n.data.machine;
+      const machine = { ...baseMachine, name: metrics?.machineName || baseMachine.name, cost: metrics?.cost ?? baseMachine.cost };
+      return {
+        ...n,
+        data: {
+          ...n.data,
+          machine,
+          recipe: {
+            ...n.data.recipe,
+            name: metrics?.recipeName || 'Custom Recipe',
+            machine_id: 'm_custom',
+            cycle_time: metrics?.cycleTime || 5,
+            power_consumption: metrics?.powerConsumption || 0,
+            power_type: metrics?.powerType || 'MV',
+            pollution: metrics?.pollution || 0,
+            inputs,
+            outputs,
+            isCustom: true,
+            customSettings: settings
+          },
+          leftHandles: Math.max(inputs.length, 1),
+          rightHandles: Math.max(outputs.length, 1)
+        }
+      };
+    }));
+    cleanupInvalidConnections(nodeId, inputs, outputs);
+    triggerRecalculation('customSettings');
+  }, [cleanupInvalidConnections, triggerRecalculation, setNodes]);
 
   const createRecipeBox = useCallback((recipe, overrideMachineCount = null) => {
     const machine = getMachine(recipe.machine_id);
@@ -1529,6 +1561,39 @@ function App() {
     triggerRecalculation();
     return newNodeId;
   }, [nodeId, nodes, setNodes, setEdges, displayMode, machineDisplayMode, lastDrillConfig, lastAssemblerConfig, lastTreeFarmConfig, lastFireboxConfig, findBestDepthForProduct, recipeMachineCounts, globalPollution, selectedProduct, triggerRecalculation, autoConnectTarget, edgeSettings, createNodeCallbacks]);
+
+  const createCustomRecipe = useCallback(() => {
+    const machine = getMachine('m_custom');
+    if (!machine) return null;
+
+    const defaultSettings = {
+      recipeName: 'Custom Recipe',
+      machineName: 'Custom Machine',
+      cycleTime: 5,
+      powerConsumption: 0,
+      powerType: 'MV',
+      pollution: 0,
+      cost: 0,
+      inputs: [{ product: '', quantity: 1 }],
+      outputs: [{ product: '', quantity: 1 }]
+    };
+
+    const customRecipe = {
+      id: `r_custom_${Date.now()}`,
+      name: 'Custom Recipe',
+      machine_id: 'm_custom',
+      cycle_time: 5,
+      power_consumption: 0,
+      power_type: 'MV',
+      pollution: 0,
+      isCustom: true,
+      customSettings: defaultSettings,
+      inputs: [{ product_id: 'p_any_item', quantity: 1, q_mode: 'none' }],
+      outputs: [{ product_id: 'p_any_item', quantity: 1, q_mode: 'none' }]
+    };
+
+    return createRecipeBox(customRecipe, 1);
+  }, [createRecipeBox]);
 
   const deleteRecipeBoxAndTarget = useCallback((boxId) => {
     setNodes((nds) => nds.filter((n) => n.id !== boxId));
@@ -2722,6 +2787,16 @@ function App() {
                     <button onClick={() => setSelectorMode('product')} className={`btn ${selectorMode === 'product' ? 'btn-primary' : 'btn-secondary'}`} style={{ flex: 1 }}>By Products</button>
                     <button onClick={() => setSelectorMode('machine')} className={`btn ${selectorMode === 'machine' ? 'btn-primary' : 'btn-secondary'}`} style={{ flex: 1 }}>By Machines</button>
                   </div>
+                  <button
+                    onClick={() => {
+                      createCustomRecipe();
+                      resetSelector();
+                    }}
+                    className="btn btn-primary"
+                    style={{ width: '100%', padding: '12px', fontSize: '15px', fontWeight: 700 }}
+                  >
+                    + Custom Recipe
+                  </button>
                 </div>
                 {selectorMode === 'product' ? (
                   <>

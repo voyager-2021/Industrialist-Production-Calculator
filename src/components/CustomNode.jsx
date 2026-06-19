@@ -15,7 +15,7 @@ const smartFormat = (num) => typeof num === 'number' ? Math.round(num * 10000) /
 const CustomNode = memo(({ data, id }) => {
   const { recipe, machine, machineCount, displayMode, machineDisplayMode, onInputClick, onOutputClick, isTarget,
     onDrillSettingsChange, onLogicAssemblerSettingsChange, onTreeFarmSettingsChange, onIndustrialFireboxSettingsChange, 
-    onTemperatureSettingsChange, onBoilerSettingsChange, onChemicalPlantSettingsChange, globalPollution, flows, isMobile, mobileActionMode, onMachineCountModeChange, zoomLevel } = data;
+    onTemperatureSettingsChange, onBoilerSettingsChange, onChemicalPlantSettingsChange, onCustomRecipeChange, globalPollution, flows, isMobile, mobileActionMode, onMachineCountModeChange, zoomLevel } = data;
   
   const showDetails = !zoomLevel || zoomLevel >= 0.25;
   
@@ -37,6 +37,7 @@ const CustomNode = memo(({ data, id }) => {
   const isWasteFacility = recipe.isWasteFacility || recipe.id === 'r_underground_waste_facility';
   const isLiquidDump = recipe.isLiquidDump || recipe.id === 'r_liquid_dump';
   const isLiquidBurner = recipe.isLiquidBurner || recipe.id === 'r_liquid_burner';
+  const isCustom = recipe.isCustom || machine?.id === 'm_custom';
   const isSpecialRecipe = isMineshaftDrill || isLogicAssembler || isTreeFarm || isWasteFacility || isLiquidDump || isLiquidBurner;
   const hasTemperatureConfig = needsTemperatureConfig(machine.id);
   const hasBoilerConfig = needsBoilerConfig(machine.id);
@@ -279,6 +280,11 @@ const CustomNode = memo(({ data, id }) => {
             onDoubleClick={(e) => e.stopPropagation()}
             className="drill-settings-button" title="Configure Boiler" style={{ right: '10px' }}>⚙️</button>
         )}
+        {isCustom && (
+          <button onClick={(e) => { e.stopPropagation(); setSettingsModal('custom'); }} 
+            onDoubleClick={(e) => e.stopPropagation()}
+            className="drill-settings-button" title="Configure Custom Recipe">⚙️</button>
+        )}
 
         <div className="node-recipe-name" title={recipe.name}>{recipe.name}</div>
 
@@ -425,6 +431,7 @@ const CustomNode = memo(({ data, id }) => {
             settingsModal === 'boiler' ? recipe.temperatureSettings :
             settingsModal === 'chemicalPlant' ? recipe.chemicalPlantSettings :
             settingsModal === 'wasteFacility' ? recipe.wasteFacilitySettings :
+            settingsModal === 'custom' ? recipe.customSettings :
             {}
           }
           recipe={recipe}
@@ -438,6 +445,7 @@ const CustomNode = memo(({ data, id }) => {
             settingsModal === 'boiler' ? onBoilerSettingsChange :
             settingsModal === 'chemicalPlant' ? onChemicalPlantSettingsChange :
             settingsModal === 'wasteFacility' ? data.onWasteFacilitySettingsChange :
+            settingsModal === 'custom' ? onCustomRecipeChange :
             () => {}
           }
           onClose={() => setSettingsModal(null)}

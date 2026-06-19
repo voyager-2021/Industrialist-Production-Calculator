@@ -1619,5 +1619,19 @@
     "variant": "none",
     "limited": false,
     "gamemode": "any"
+  },
+  {
+    "id": "m_custom",
+    "name": "Custom Machine",
+    "cost": 0,
+    "size": "0x0",
+    "tier": 1,
+    "transfer_rate": 0,
+    "capacity": 0,
+    "category": "Custom",
+    "subcategory": "Custom",
+    "variant": "none",
+    "limited": false,
+    "gamemode": "any"
   }
 ]

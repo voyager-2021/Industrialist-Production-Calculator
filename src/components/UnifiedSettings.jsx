@@ -1,6 +1,7 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useCallback, useMemo } from 'react';
 import ReactDOM from 'react-dom';
 import { getSettingsConfig } from './settingsConfig.jsx';
+import { products } from '../data/dataLoader';
 
 const UnifiedSettings = ({ recipeType, nodeId, currentSettings, recipe, globalPollution, onSettingsChange, onClose }) => {
   const config = getSettingsConfig(recipeType, recipe, globalPollution);
@@ -324,9 +325,152 @@ const SettingsField = ({ field, value, settings, onChange }) => {
         </div>
       );
 
+    case 'product-input':
+      return <ProductInputField field={field} value={value} onChange={onChange} />;
+
+    case 'dynamic-list':
+      return (
+        <div className="drill-setting-group">
+          <label className="drill-setting-label" style={{ marginBottom: '8px', display: 'block' }}>{field.label}</label>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+            {value.map((item, idx) => (
+              <div key={idx} style={{
+                display: 'flex', gap: '6px', alignItems: 'flex-start',
+                padding: '8px', background: 'var(--bg-main)',
+                borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-light)'
+              }}>
+                <span style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '8px', minWidth: '16px' }}>{idx + 1}.</span>
+                {field.subFields.map((subField, sfIdx) => (
+                  <div key={sfIdx} style={{ flex: subField.type === 'product-input' ? 3 : 1, minWidth: 0 }}>
+                    <SettingsField
+                      field={{
+                        ...subField,
+                        noMargin: true,
+                        label: ''
+                      }}
+                      value={item[subField.key]}
+                      settings={settings}
+                      onChange={(newVal) => {
+                        const newItems = [...value];
+                        newItems[idx] = { ...newItems[idx], [subField.key]: newVal };
+                        onChange(newItems);
+                      }}
+                    />
+                  </div>
+                ))}
+                <button
+                  onClick={() => {
+                    const newItems = value.filter((_, i) => i !== idx);
+                    onChange(newItems);
+                  }}
+                  style={{
+                    background: 'none', border: 'none', cursor: 'pointer',
+                    color: '#ef4444', fontSize: '16px', padding: '6px 4px',
+                    lineHeight: 1, flexShrink: 0, marginTop: '2px'
+                  }}
+                  title="Remove"
+                >
+                  ✕
+                </button>
+              </div>
+            ))}
+          </div>
+          <button
+            onClick={() => {
+              onChange([...value, { ...field.defaultItem }]);
+            }}
+            className="btn btn-secondary"
+            style={{ marginTop: '8px', padding: '6px 12px', fontSize: '12px', minWidth: 'auto' }}
+          >
+            + Add {field.label === 'Inputs' ? 'Input' : field.label === 'Outputs' ? 'Output' : 'Item'}
+          </button>
+        </div>
+      );
+
     default:
       return null;
   }
+};
+
+const ProductInputField = ({ field, value, onChange }) => {
+  const [focused, setFocused] = useState(false);
+  const [search, setSearch] = useState(() => {
+    if (!value) return '';
+    const product = products.find(p => p.id === value);
+    return product ? product.name : value;
+  });
+  const inputRef = useRef(null);
+  const dropdownRef = useRef(null);
+
+  const filtered = useMemo(() => {
+    if (!search) return products.slice(0, 50);
+    const lower = search.toLowerCase();
+    return products.filter(p =>
+      p.name.toLowerCase().includes(lower) ||
+      p.id.toLowerCase().includes(lower)
+    ).slice(0, 100);
+  }, [search]);
+
+  const handleSelect = (product) => {
+    setSearch(product.name);
+    onChange(product.id);
+    setFocused(false);
+  };
+
+  const handleInputChange = (text) => {
+    setSearch(text);
+    onChange(text);
+  };
+
+  const handleBlur = (e) => {
+    if (dropdownRef.current && dropdownRef.current.contains(e.relatedTarget)) return;
+    setTimeout(() => setFocused(false), 200);
+  };
+
+  return (
+    <div style={{ position: 'relative', marginBottom: field.noMargin ? 0 : '15px' }}>
+      {field.label && <label className="drill-setting-label">{field.label}</label>}
+      <input
+        ref={inputRef}
+        type="text"
+        value={search}
+        onChange={(e) => handleInputChange(e.target.value)}
+        onFocus={() => setFocused(true)}
+        onBlur={handleBlur}
+        placeholder={field.placeholder || 'Search product...'}
+        className="input"
+        style={{ width: '100%' }}
+      />
+      {focused && search && filtered.length > 0 && (
+        <div ref={dropdownRef}
+          style={{
+            position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 100,
+            background: 'var(--bg-secondary)', border: '1px solid var(--border-primary)',
+            borderRadius: 'var(--radius-sm)', maxHeight: '200px', overflowY: 'auto',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.3)'
+          }}
+        >
+          {filtered.map(p => (
+            <div key={p.id}
+              onClick={() => handleSelect(p)}
+              style={{
+                padding: '6px 10px', cursor: 'pointer', fontSize: '12px',
+                color: 'var(--text-primary)', borderBottom: '1px solid var(--border-light)',
+                display: 'flex', justifyContent: 'space-between', gap: '8px'
+              }}
+              onMouseEnter={(e) => e.currentTarget.style.background = 'var(--bg-main)'}
+              onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+            >
+              <span>{p.name}</span>
+              <span style={{ color: 'var(--text-muted)', fontSize: '10px', flexShrink: 0 }}>
+                {p.type === 'fluid' ? '💧' : '📦'} {p.price === 'Variable' ? '' : `$${p.price}`}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 };
 
 export default UnifiedSettings;
